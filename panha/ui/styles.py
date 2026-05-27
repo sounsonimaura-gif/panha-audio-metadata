@@ -227,16 +227,16 @@ QCheckBox::indicator:checked {
 }
 
 QGroupBox {
-    border: 1px solid #1c3050;
+    border: 1px solid #2a4670;
     border-radius: 6px;
     margin-top: 14px;
-    padding-top: 8px;
+    padding-top: 10px;
     background-color: #11203a;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
-    left: 10px;
+    left: 12px;
     padding: 0 6px;
     color: #5fa8ff;
     font-weight: 600;
