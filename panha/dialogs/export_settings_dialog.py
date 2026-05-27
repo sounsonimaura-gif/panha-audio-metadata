@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFormLayout,
     QFrame,
-    QGroupBox,
     QLabel,
     QPushButton,
     QSpinBox,
@@ -145,23 +144,23 @@ class ExportSettingsDialog(QDialog):
         form.addRow("Max Threads", self.spn_threads)
         root.addLayout(form)
 
-        proc_box = QGroupBox("Processing Options")
-        proc_layout = QVBoxLayout(proc_box)
-        proc_layout.setContentsMargins(12, 14, 12, 10)
+        self._add_section_header(root, "Processing Options")
         self.chk_suno = QCheckBox("SUNO Bypass")
         self.chk_vocal = QCheckBox("Vocal Clarity Boost")
         self.chk_softclip = QCheckBox("Soft Clip Ceiling")
         for w in (self.chk_suno, self.chk_vocal, self.chk_softclip):
-            proc_layout.addWidget(w)
-        root.addWidget(proc_box)
+            root.addWidget(w)
 
-        master_box = QGroupBox("Mastering Target")
-        master_layout = QFormLayout(master_box)
-        master_layout.setContentsMargins(12, 14, 12, 10)
+        self._add_section_header(root, "Mastering Target")
+        master_layout = QFormLayout()
+        master_layout.setHorizontalSpacing(12)
+        master_layout.setVerticalSpacing(8)
         self.cmb_lufs = QComboBox()
         self.cmb_lufs.addItems(LUFS_TARGETS)
         master_layout.addRow("LUFS Target", self.cmb_lufs)
-        root.addWidget(master_box)
+        root.addLayout(master_layout)
+
+        root.addSpacing(4)
 
         self.btn_start = QPushButton("\u25B6  Start Export")
         self.btn_start.setObjectName("primaryButton")
@@ -171,6 +170,18 @@ class ExportSettingsDialog(QDialog):
         self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.clicked.connect(self.reject)
         root.addWidget(self.btn_cancel)
+
+    def _add_section_header(self, layout: QVBoxLayout, text: str) -> None:
+        """Inline section header — small cyan label above a thin divider."""
+        label = QLabel(text)
+        label.setObjectName("sectionTitle")
+        label.setStyleSheet("font-size:11px;color:#5fa8ff;")
+        layout.addSpacing(2)
+        layout.addWidget(label)
+        rule = QFrame()
+        rule.setFrameShape(QFrame.Shape.HLine)
+        rule.setStyleSheet("color:#1c3050;background:#1c3050;max-height:1px;")
+        layout.addWidget(rule)
 
     def _load(self, s: ExportSettings) -> None:
         for combo, value in (
