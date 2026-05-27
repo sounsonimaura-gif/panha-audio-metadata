@@ -7,15 +7,11 @@ studio metadata, tracklist options and a template preset selector.
 from __future__ import annotations
 
 import dataclasses
-from pathlib import Path
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QFileDialog,
     QFormLayout,
     QFrame,
@@ -26,7 +22,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
-    QPlainTextEdit,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -50,6 +45,7 @@ class TracklistOptions:
     uppercase: bool = False
     remove_track_number: bool = True
     cover_size: int = 1600
+    cover_height: int = 1600
 
 
 @dataclasses.dataclass
@@ -96,6 +92,11 @@ class FileInformationDialog(QDialog):
         self.setMinimumWidth(640)
         self._templates = TemplateStore()
         self._state = state or FileInformationState()
+        # Title and description are no longer surfaced in the UI but are
+        # preserved on the state so template round-trips and the worker's
+        # title-fallback logic keep working.
+        self._title_value: str = ""
+        self._description_value: str = ""
         self._build_ui()
         self._load_state(self._state)
         self._refresh_template_list()
@@ -145,7 +146,6 @@ class FileInformationDialog(QDialog):
         basic_grid.setHorizontalSpacing(12)
         basic_grid.setVerticalSpacing(8)
 
-        self.ed_title = QLineEdit()
         self.ed_artist = QLineEdit()
         self.ed_year = QLineEdit()
         self.ed_album = QLineEdit()
@@ -162,41 +162,24 @@ class FileInformationDialog(QDialog):
         self.btn_cover_folder = QPushButton("Folder")
         self.btn_cover_folder.clicked.connect(self._on_browse_cover_folder)
 
-        basic_grid.addWidget(QLabel("Title:"), 0, 0)
-        basic_grid.addWidget(self.ed_title, 0, 1, 1, 5)
+        basic_grid.addWidget(QLabel("Artist:"), 0, 0)
+        basic_grid.addWidget(self.ed_artist, 0, 1)
+        basic_grid.addWidget(QLabel("Year:"), 0, 2)
+        basic_grid.addWidget(self.ed_year, 0, 3, 1, 3)
 
-        basic_grid.addWidget(QLabel("Artist:"), 1, 0)
-        basic_grid.addWidget(self.ed_artist, 1, 1, 1, 2)
-        basic_grid.addWidget(QLabel("Year:"), 1, 3)
-        basic_grid.addWidget(self.ed_year, 1, 4, 1, 2)
+        basic_grid.addWidget(QLabel("Album:"), 1, 0)
+        basic_grid.addWidget(self.ed_album, 1, 1)
+        basic_grid.addWidget(QLabel("Rating:"), 1, 2)
+        basic_grid.addWidget(self.ed_rating, 1, 3, 1, 3)
 
-        basic_grid.addWidget(QLabel("Album:"), 2, 0)
-        basic_grid.addWidget(self.ed_album, 2, 1, 1, 2)
-        basic_grid.addWidget(QLabel("Rating:"), 2, 3)
-        basic_grid.addWidget(self.ed_rating, 2, 4, 1, 2)
-
-        basic_grid.addWidget(QLabel("Genre:"), 3, 0)
-        basic_grid.addWidget(self.ed_genre, 3, 1, 1, 2)
-        basic_grid.addWidget(QLabel("Cover:"), 3, 3)
-        basic_grid.addWidget(self.ed_cover, 3, 4)
-        basic_grid.addWidget(self.btn_cover_browse, 3, 5)
-
-        basic_grid.addWidget(QLabel("Description:"), 4, 0, Qt.AlignmentFlag.AlignTop)
-        self.ed_description = QPlainTextEdit()
-        self.ed_description.setFixedHeight(64)
-        basic_grid.addWidget(self.ed_description, 4, 1, 1, 5)
-        basic_grid.addWidget(self.btn_cover_folder, 3, 6)
-
-        # Cover preview
-        self.cover_preview = QLabel()
-        self.cover_preview.setFixedSize(120, 120)
-        self.cover_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.cover_preview.setStyleSheet(
-            "background-color:#0a1426;border:1px solid #1c3050;border-radius:6px;color:#4a5a72;"
-        )
-        self.cover_preview.setText("(no cover)")
-        basic_grid.addWidget(self.cover_preview, 0, 6, 3, 1, Qt.AlignmentFlag.AlignTop)
-        self.ed_cover.textChanged.connect(self._refresh_cover_preview)
+        basic_grid.addWidget(QLabel("Genre:"), 2, 0)
+        basic_grid.addWidget(self.ed_genre, 2, 1)
+        basic_grid.addWidget(QLabel("Cover:"), 2, 2)
+        basic_grid.addWidget(self.ed_cover, 2, 3)
+        basic_grid.addWidget(self.btn_cover_browse, 2, 4)
+        basic_grid.addWidget(self.btn_cover_folder, 2, 5)
+        basic_grid.setColumnStretch(1, 1)
+        basic_grid.setColumnStretch(3, 1)
 
         root.addWidget(basic_box)
 
@@ -245,31 +228,44 @@ class FileInformationDialog(QDialog):
         self.chk_remove_tracknum.setChecked(True)
         tl_layout.addWidget(self.chk_uppercase)
         tl_layout.addWidget(self.chk_remove_tracknum)
-        tl_layout.addWidget(QLabel("Cover Size (px):"))
+        tl_layout.addStretch(1)
+        tl_layout.addWidget(QLabel("Cover Size:"))
         self.spn_cover_size = QSpinBox()
         self.spn_cover_size.setRange(64, 8192)
         self.spn_cover_size.setValue(1600)
         self.spn_cover_size.setSingleStep(64)
+        self.spn_cover_size.setFixedWidth(80)
         tl_layout.addWidget(self.spn_cover_size)
-        tl_layout.addStretch(1)
+        tl_layout.addWidget(QLabel("x"))
+        self.spn_cover_height = QSpinBox()
+        self.spn_cover_height.setRange(64, 8192)
+        self.spn_cover_height.setValue(1600)
+        self.spn_cover_height.setSingleStep(64)
+        self.spn_cover_height.setFixedWidth(80)
+        tl_layout.addWidget(self.spn_cover_height)
         root.addWidget(tracklist_box)
 
-        # Buttons
-        buttons = QDialogButtonBox()
-        self.btn_cancel = buttons.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
-        self.btn_apply = buttons.addButton("Apply setting", QDialogButtonBox.ButtonRole.AcceptRole)
+        # Buttons — explicit Cancel | Apply setting order to match the
+        # design (Qt's QDialogButtonBox auto-orders by platform style).
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.clicked.connect(self.reject)
+        button_row.addWidget(self.btn_cancel)
+        self.btn_apply = QPushButton("Apply setting")
         self.btn_apply.setObjectName("primaryButton")
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        root.addWidget(buttons)
+        self.btn_apply.setDefault(True)
+        self.btn_apply.clicked.connect(self.accept)
+        button_row.addWidget(self.btn_apply)
+        root.addLayout(button_row)
 
     # -- state ----------------------------------------------------------
 
     def _load_state(self, state: FileInformationState) -> None:
         meta = state.metadata
         self.chk_enable.setChecked(state.enabled)
-        self.ed_title.setText(state.title or meta.title)
-        self.ed_description.setPlainText(state.description or meta.description)
+        self._title_value = state.title or meta.title
+        self._description_value = state.description or meta.description
         self.ed_artist.setText(meta.artist)
         self.ed_album.setText(meta.album)
         self.ed_year.setText(meta.year)
@@ -292,14 +288,14 @@ class FileInformationDialog(QDialog):
         self.chk_uppercase.setChecked(state.tracklist.uppercase)
         self.chk_remove_tracknum.setChecked(state.tracklist.remove_track_number)
         self.spn_cover_size.setValue(state.tracklist.cover_size)
-        self._refresh_cover_preview()
+        self.spn_cover_height.setValue(state.tracklist.cover_height)
 
     def collect_state(self) -> FileInformationState:
         rating = self.ed_rating.currentText()
         if rating == "None":
             rating = ""
         meta = Metadata(
-            title=self.ed_title.text().strip(),
+            title=self._title_value,
             artist=self.ed_artist.text().strip(),
             album=self.ed_album.text().strip(),
             year=self.ed_year.text().strip(),
@@ -311,19 +307,20 @@ class FileInformationDialog(QDialog):
             software=self.ed_software.text().strip(),
             source=self.ed_source.text().strip(),
             comment=self.ed_comment.text().strip(),
-            description=self.ed_description.toPlainText().strip(),
+            description=self._description_value,
         )
         tracklist = TracklistOptions(
             uppercase=self.chk_uppercase.isChecked(),
             remove_track_number=self.chk_remove_tracknum.isChecked(),
             cover_size=int(self.spn_cover_size.value()),
+            cover_height=int(self.spn_cover_height.value()),
         )
         return FileInformationState(
             enabled=self.chk_enable.isChecked(),
             metadata=meta,
             tracklist=tracklist,
-            title=self.ed_title.text().strip(),
-            description=self.ed_description.toPlainText().strip(),
+            title=self._title_value,
+            description=self._description_value,
         )
 
     # -- cover ----------------------------------------------------------
@@ -339,34 +336,6 @@ class FileInformationDialog(QDialog):
         path = QFileDialog.getExistingDirectory(self, "Select cover folder")
         if path:
             self.ed_cover.setText(path)
-
-    def _refresh_cover_preview(self) -> None:
-        text = self.ed_cover.text().strip()
-        if not text:
-            self.cover_preview.clear()
-            self.cover_preview.setText("(no cover)")
-            return
-        path = Path(text)
-        if path.is_dir():
-            # pick first image in folder
-            for child in sorted(path.iterdir()):
-                if child.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
-                    path = child
-                    break
-            else:
-                self.cover_preview.setText("(no image)")
-                return
-        pix = QPixmap(str(path))
-        if pix.isNull():
-            self.cover_preview.setText("(invalid)")
-            return
-        self.cover_preview.setPixmap(
-            pix.scaled(
-                self.cover_preview.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-        )
 
     # -- templates ------------------------------------------------------
 
