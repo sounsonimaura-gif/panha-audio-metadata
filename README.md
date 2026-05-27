@@ -26,9 +26,11 @@ File Information dialog, animated waveform).
   to `~/.panha_templates.json`; **Save As / Update / Remove / Reset all** live on the
   Setting Console template row
 - **File Information dialog** with all standard ID3v2 fields:
-  - Title, Artist, Album, Year, Genre, Rating, Cover art, Description, Comment
+  - Artist, Album, Year, Genre, Rating, Cover art, Comment
   - Studio metadata: Engineer, Copyright, Software, Source
-  - Tracklist options: UPPERCASE, Remove Track Number, Cover Size
+  - Tracklist options: UPPERCASE, Remove Track Number, Cover Size (W x H)
+  - Per-track title falls back to the filename stem when no template title
+    is provided
 - **Cover art** embedding from a file or "folder" (first image found in folder)
 - **Export Settings** dialog (format, sample rate, bit depth, threads, mastering target)
 - **Context menu** (right-click queue): Select all / Add / Remove / Start / Stop / Open output
